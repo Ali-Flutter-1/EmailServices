@@ -1,71 +1,91 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 class MailApi {
   static const String baseUrl = 'https://api.mail.tm';
 
-  // Generate a random email
   static Future<Map<String, dynamic>> createTempAccount() async {
-    final domainResponse = await http.get(Uri.parse('$baseUrl/domains'));
-    final domainData = json.decode(domainResponse.body);
-    final domain = domainData['hydra:member'][0]['domain'];
+    try {
+      final domainResponse = await http.get(Uri.parse('$baseUrl/domains'));
 
-    final randomEmail = '${DateTime.now().millisecondsSinceEpoch}@$domain';
-    final password = 'temppassword123';
+      if (domainResponse.statusCode != 200) {
+        throw Exception('Failed to fetch domains: ${domainResponse.statusCode}');
+      }
 
-    final response = await http.post(
-      Uri.parse('$baseUrl/accounts'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'address': randomEmail,
-        'password': password,
-      }),
-    );
+      final domainData = json.decode(domainResponse.body);
+      final domains = domainData['hydra:member'] as List?;
 
-    if (response.statusCode == 201) {
-      return {
-        'email': randomEmail,
-        'password': password,
-      };
-    } else {
-      throw Exception('Failed to create email');
+      if (domains == null || domains.isEmpty) {
+        throw Exception('No domains available');
+      }
+
+      final domain = domains[0]['domain'];
+      final randomEmail = 'user${DateTime.now().millisecondsSinceEpoch}@$domain';
+      final password = 'TempPass123!'; // Stronger password
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/accounts'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'address': randomEmail,
+          'password': password,
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        return {
+          'email': randomEmail,
+          'password': password,
+        };
+      } else {
+        throw Exception('Failed to create email: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error creating account: $e');
     }
   }
 
-  // Login to get token
   static Future<String> getAuthToken(String email, String password) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/token'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'address': email,
-        'password': password,
-      }),
-    );
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/token'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'address': email,
+          'password': password,
+        }),
+      );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['token'];
-    } else {
-      throw Exception('Failed to get auth token');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['token'] ?? '';
+      } else {
+        throw Exception('Failed to get auth token: ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Error getting token: $e');
     }
   }
 
-  // Fetch inbox messages
   static Future<List<dynamic>> getInbox(String token) async {
-    final response = await http.get(
-      Uri.parse('$baseUrl/messages'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/ld+json',
-      },
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/messages'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/ld+json',
+        },
+      );
 
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      return data['hydra:member'];
-    } else {
-      throw Exception('Failed to load inbox');
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['hydra:member'] ?? [];
+      } else {
+        throw Exception('Failed to load inbox: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error loading inbox: $e');
     }
   }
 }

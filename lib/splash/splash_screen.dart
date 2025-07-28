@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:emailmil/screen/dashboard_screen.dart';
 import 'package:flutter/material.dart';
 
 
@@ -15,7 +16,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Future.delayed(Duration(seconds: 2), () {
-
+ Navigator.pushReplacement(context, MaterialPageRoute(builder: (context)=>DashboardScreen()));
     });
   }
 
